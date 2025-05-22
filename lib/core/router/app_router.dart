@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:comma/presentation/pages/main_page.dart';
 
 final goRouter = GoRouter(
   initialLocation: '/',
   routes: [
     GoRoute(
       path: '/',
-      builder: (context, state) => const Scaffold(
-        body: Center(
-          child: Text('홈 화면'),
-        ),
-      ),
+      builder: (context, state) => const MainPage(),
     ),
   ],
   errorBuilder: (context, state) => Scaffold(
