@@ -1,31 +1,32 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class MainPage extends StatefulWidget {
+import '../providers/mission_provider.dart';
+
+class MainPage extends ConsumerStatefulWidget {
   const MainPage({super.key});
 
   @override
-  State<MainPage> createState() => _MainPageState();
+  ConsumerState<MainPage> createState() => _MainPageState();
 }
 
-class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
+class _MainPageState extends ConsumerState<MainPage> with TickerProviderStateMixin {
   String _displayText = '';
-  final String _fullText = '미션';
+  String _fullText = '';
   int _charIndex = 0;
   bool _isAnimating = false;
+  bool _isLoading = true;
   
   late final AnimationController _fallController = AnimationController(
     duration: const Duration(milliseconds: 2000),
     vsync: this,
   );
 
-  // 텍스트에서 선으로 변하는 애니메이션
   late final Animation<double> _morphAnimation = CurvedAnimation(
     parent: _fallController,
     curve: const Interval(0.0, 0.3, curve: Curves.easeInOut),
   );
 
-  // 선이 떨어지는 애니메이션
   late final Animation<double> _fallAnimation = CurvedAnimation(
     parent: _fallController,
     curve: const Interval(0.3, 1.0, curve: Curves.easeIn),
@@ -34,10 +35,20 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _loadMission();
+  }
+
+  Future<void> _loadMission() async {
+    final mission = await ref.read(getMissionProvider.future);
+    setState(() {
+      _fullText = mission;
+      _isLoading = false;
+    });
     _startTypingAnimation();
   }
 
   void _startTypingAnimation() {
+    if (_isLoading) return;
     Future.delayed(const Duration(milliseconds: 500), () {
       _typeNextChar();
     });
@@ -80,38 +91,40 @@ class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
             SizedBox(
               height: screenHeight * 0.25,
               child: Center(
-                child: GestureDetector(
-                  onTap: _startFallAnimation,
-                  child: !_isAnimating
-                    ? Text(
-                        _displayText,
-                        style: const TextStyle(
-                          fontSize: 40,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 2.0,
-                        ),
-                      )
-                    : SizedBox(
-                        width: screenWidth,
-                        height: screenHeight * 0.7,
-                        child: AnimatedBuilder(
-                          animation: _fallController,
-                          builder: (context, child) {
-                            return CustomPaint(
-                              painter: LinePainter(
-                                text: _fullText,
-                                morphProgress: _morphAnimation.value,
-                                fallProgress: _fallAnimation.value,
-                                style: const TextStyle(
-                                  fontSize: 40,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                child: _isLoading
+                    ? const CircularProgressIndicator()
+                    : GestureDetector(
+                        onTap: _startFallAnimation,
+                        child: !_isAnimating
+                          ? Text(
+                              _displayText,
+                              style: const TextStyle(
+                                fontSize: 40,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 2.0,
                               ),
-                            );
-                          },
-                        ),
+                            )
+                          : SizedBox(
+                              width: screenWidth,
+                              height: screenHeight * 0.7,
+                              child: AnimatedBuilder(
+                                animation: _fallController,
+                                builder: (context, child) {
+                                  return CustomPaint(
+                                    painter: LinePainter(
+                                      text: _fullText,
+                                      morphProgress: _morphAnimation.value,
+                                      fallProgress: _fallAnimation.value,
+                                      style: const TextStyle(
+                                        fontSize: 40,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
                       ),
-                ),
               ),
             ),
             const Expanded(child: SizedBox()),
@@ -181,4 +194,4 @@ class LinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-} 
+}
