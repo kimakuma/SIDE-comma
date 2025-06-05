@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'dart:math' as math;
 import '../providers/mission_provider.dart';
+import '../providers/water_level_provider.dart';
 
 class MainPage extends ConsumerStatefulWidget {
   const MainPage({super.key});
@@ -13,23 +14,24 @@ class MainPage extends ConsumerStatefulWidget {
 class _MainPageState extends ConsumerState<MainPage> with TickerProviderStateMixin {
   String _displayText = '';
   String _fullText = '';
-  int _charIndex = 0;
   bool _isAnimating = false;
   bool _isLoading = true;
+  bool _isTypingComplete = false;
+  int _charIndex = 0;
   
-  late final AnimationController _fallController = AnimationController(
-    duration: const Duration(milliseconds: 2000),
+  late final AnimationController _shrinkController = AnimationController(
+    duration: const Duration(milliseconds: 1000),
     vsync: this,
   );
 
-  late final Animation<double> _morphAnimation = CurvedAnimation(
-    parent: _fallController,
-    curve: const Interval(0.0, 0.3, curve: Curves.easeInOut),
-  );
+  late final AnimationController _waveController = AnimationController(
+    duration: const Duration(milliseconds: 2000),
+    vsync: this,
+  )..repeat();
 
-  late final Animation<double> _fallAnimation = CurvedAnimation(
-    parent: _fallController,
-    curve: const Interval(0.3, 1.0, curve: Curves.easeIn),
+  late final Animation<double> _shrinkAnimation = CurvedAnimation(
+    parent: _shrinkController,
+    curve: Curves.easeInOut,
   );
 
   @override
@@ -39,7 +41,17 @@ class _MainPageState extends ConsumerState<MainPage> with TickerProviderStateMix
   }
 
   Future<void> _loadMission() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _isAnimating = false;
+      _isTypingComplete = false;
+      _charIndex = 0;
+      _displayText = '';
+    });
+
     final mission = await ref.read(getMissionProvider.future);
+    if (!mounted) return;
     setState(() {
       _fullText = mission;
       _isLoading = false;
@@ -50,32 +62,48 @@ class _MainPageState extends ConsumerState<MainPage> with TickerProviderStateMix
   void _startTypingAnimation() {
     if (_isLoading) return;
     Future.delayed(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
       _typeNextChar();
     });
   }
 
   void _typeNextChar() {
+    if (!mounted) return;
     if (_charIndex < _fullText.length) {
       setState(() {
         _displayText = _fullText.substring(0, _charIndex + 1);
         _charIndex++;
       });
       Future.delayed(const Duration(milliseconds: 200), _typeNextChar);
+    } else {
+      setState(() {
+        _isTypingComplete = true;
+      });
     }
   }
 
-  void _startFallAnimation() {
-    if (!_isAnimating && _charIndex >= _fullText.length) {
+  void _startShrinkAnimation() {
+    if (!_isAnimating && _isTypingComplete) {
       setState(() {
         _isAnimating = true;
       });
-      _fallController.forward();
+      ref.read(waterLevelProvider.notifier).increaseWaterLevel();
+      _shrinkController.forward().then((_) {
+        if (!mounted) return;
+        _loadMission();
+      });
     }
+  }
+
+  void _resetMission() {
+    _shrinkController.reset();
+    _loadMission();
   }
 
   @override
   void dispose() {
-    _fallController.dispose();
+    _shrinkController.dispose();
+    _waveController.dispose();
     super.dispose();
   }
 
@@ -83,56 +111,154 @@ class _MainPageState extends ConsumerState<MainPage> with TickerProviderStateMix
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
+    final circleSize = screenWidth * 0.5;
+    final waterLevel = ref.watch(waterLevelProvider);
     
     return Scaffold(
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            SizedBox(
-              height: screenHeight * 0.25,
-              child: Center(
-                child: _isLoading
-                    ? const CircularProgressIndicator()
-                    : GestureDetector(
-                        onTap: _startFallAnimation,
-                        child: !_isAnimating
-                          ? Text(
-                              _displayText,
-                              style: const TextStyle(
-                                fontSize: 40,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 2.0,
-                              ),
-                            )
-                          : SizedBox(
-                              width: screenWidth,
-                              height: screenHeight * 0.7,
-                              child: AnimatedBuilder(
-                                animation: _fallController,
-                                builder: (context, child) {
-                                  return CustomPaint(
-                                    painter: LinePainter(
-                                      text: _fullText,
-                                      morphProgress: _morphAnimation.value,
-                                      fallProgress: _fallAnimation.value,
-                                      style: const TextStyle(
-                                        fontSize: 40,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  );
-                                },
+            // 텍스트 애니메이션
+            Positioned(
+              top: screenHeight * 0.15,
+              left: 0,
+              right: 0,
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : GestureDetector(
+                      onTap: _startShrinkAnimation,
+                      child: AnimatedBuilder(
+                        animation: _shrinkAnimation,
+                        builder: (context, child) {
+                          final scale = 1.0 - (_shrinkAnimation.value * 0.8);
+                          final opacity = 1.0 - _shrinkAnimation.value;
+                          final moveDown = _shrinkAnimation.value * screenHeight * 0.3;
+                          
+                          return Transform.translate(
+                            offset: Offset(0, moveDown),
+                            child: Opacity(
+                              opacity: opacity,
+                              child: Transform.scale(
+                                scale: scale,
+                                child: Text(
+                                  _displayText,
+                                  style: const TextStyle(
+                                    fontSize: 40,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 2.0,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
                               ),
                             ),
+                          );
+                        },
                       ),
+                    ),
+            ),
+            
+            // 새로고침 버튼
+            Positioned(
+              top: screenHeight * 0.4,
+              left: (screenWidth - 60) / 2,
+              child: GestureDetector(
+                onTap: _resetMission,
+                child: Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.blue.withOpacity(0.3),
+                  ),
+                  child: const Icon(
+                    Icons.refresh,
+                    color: Colors.blue,
+                    size: 30,
+                  ),
+                ),
               ),
             ),
-            const Expanded(child: SizedBox()),
+            
+            // 물결 원
+            Positioned(
+              bottom: screenHeight * 0.2,
+              left: (screenWidth - circleSize) / 2,
+              width: circleSize,
+              height: circleSize,
+              child: Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.blue,
+                        width: 2.0,
+                      ),
+                    ),
+                  ),
+                  if (_isAnimating || waterLevel > 0)
+                    AnimatedBuilder(
+                      animation: _waveController,
+                      builder: (context, child) {
+                        return CustomPaint(
+                          painter: WavePainter(
+                            animation: _waveController,
+                            fillPercent: waterLevel,
+                            waveColor: Colors.blue.withOpacity(0.3),
+                          ),
+                          size: Size(circleSize, circleSize),
+                        );
+                      },
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
     );
   }
+}
+
+class WavePainter extends CustomPainter {
+  final Animation<double> animation;
+  final double fillPercent;
+  final Color waveColor;
+
+  WavePainter({
+    required this.animation,
+    required this.fillPercent,
+    required this.waveColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final path = Path();
+    
+    canvas.clipPath(Path()..addOval(rect));
+
+    final waveHeight = size.height * 0.05;
+    final baseHeight = size.height * (1 - fillPercent);
+    
+    path.moveTo(0, baseHeight);
+    
+    for (var i = 0.0; i <= size.width; i++) {
+      path.lineTo(
+        i,
+        baseHeight + math.sin((animation.value * 360 + i) * math.pi / 180) * waveHeight,
+      );
+    }
+    
+    path.lineTo(size.width, size.height);
+    path.lineTo(0, size.height);
+    path.close();
+    
+    canvas.drawPath(path, Paint()..color = waveColor);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
 class LinePainter extends CustomPainter {

@@ -1,6 +1,4 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-
-import '../../data/models/mission.dart';
 import '../../domain/repositories/mission_repository.dart';
 import '../../data/repositories/local_mission_repository.dart';
 
@@ -14,5 +12,5 @@ MissionRepository missionRepository(MissionRepositoryRef ref) {
 @riverpod
 Future<String> getMission(GetMissionRef ref) {
   final repository = ref.watch(missionRepositoryProvider);
-  return repository.getMission();
+  return repository.getRandomMission();
 }

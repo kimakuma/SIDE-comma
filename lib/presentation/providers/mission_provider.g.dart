@@ -24,7 +24,7 @@ final missionRepositoryProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef MissionRepositoryRef = AutoDisposeProviderRef<MissionRepository>;
-String _$getMissionHash() => r'a53e546782f2c2ee2220e85cd58ac0e960d133f7';
+String _$getMissionHash() => r'd92cf731e2ddff88ce81ed67785326dfd465db09';
 
 /// See also [getMission].
 @ProviderFor(getMission)

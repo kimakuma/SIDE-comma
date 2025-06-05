@@ -86,7 +86,8 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/data/
+    - assets/data/missions.json
+    - assets/data/complete_messages.json
 
   # To add assets to your application, add an assets section, like this:
   # assets:
