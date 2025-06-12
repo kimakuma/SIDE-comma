@@ -69,17 +69,15 @@ flutter pub get
 ```
 
 3. 환경 변수 설정
-- `lib/core/config/env.dart` 파일을 생성하고 다음 내용을 추가:
-```dart
-class Env {
-  static String kakaoRestApiKey = 'YOUR_KAKAO_REST_API_KEY';
-  static String redirectUri = 'YOUR_REDIRECT_URI';
-  
-  static Future<void> initialize() async {
-    // 초기화 로직
-  }
-}
+- `lib/core/config/env.example.dart` 파일을 `env.dart`로 복사:
+```bash
+cp lib/core/config/env.example.dart lib/core/config/env.dart
 ```
+- `env.dart` 파일에서 다음 값들을 실제 값으로 수정:
+  * `kakaoRestApiKey`: 카카오 개발자 콘솔에서 발급받은 REST API 키
+  * `redirectUri`: 카카오 로그인 Redirect URI
+  * `apiBaseUrl`: 백엔드 API 서버 주소
+  * 기타 환경 설정 값들
 
 4. 코드 생성
 ```bash
@@ -120,6 +118,12 @@ features/new_feature/
 - 각 레이어의 책임 분리
 - 의존성 주입 사용
 - 테스트 가능한 코드 작성
+
+## 보안
+
+- 환경 변수 파일(`env.dart`)은 절대로 Git에 커밋하지 않습니다.
+- API 키와 같은 민감한 정보는 항상 환경 변수로 관리합니다.
+- 실제 값이 포함된 설정 파일은 팀원들과 안전한 방법으로 공유합니다.
 
 ## 라이센스
 
