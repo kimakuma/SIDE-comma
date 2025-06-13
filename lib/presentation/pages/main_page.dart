@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:math' as math;
 import '../providers/mission_provider.dart';
 import '../providers/water_level_provider.dart';
+import '../../data/api/mission_api.dart';
 
 class MainPage extends ConsumerStatefulWidget {
   const MainPage({super.key});
@@ -14,25 +15,13 @@ class MainPage extends ConsumerStatefulWidget {
 class _MainPageState extends ConsumerState<MainPage> with TickerProviderStateMixin {
   String _displayText = '';
   String _fullText = '';
-  bool _isAnimating = false;
   bool _isLoading = true;
-  bool _isTypingComplete = false;
-  int _charIndex = 0;
+  String _errorMessage = '';
   
-  late final AnimationController _shrinkController = AnimationController(
-    duration: const Duration(milliseconds: 1000),
-    vsync: this,
-  );
-
   late final AnimationController _waveController = AnimationController(
     duration: const Duration(milliseconds: 2000),
     vsync: this,
   )..repeat();
-
-  late final Animation<double> _shrinkAnimation = CurvedAnimation(
-    parent: _shrinkController,
-    curve: Curves.easeInOut,
-  );
 
   @override
   void initState() {
@@ -44,65 +33,66 @@ class _MainPageState extends ConsumerState<MainPage> with TickerProviderStateMix
     if (!mounted) return;
     setState(() {
       _isLoading = true;
-      _isAnimating = false;
-      _isTypingComplete = false;
-      _charIndex = 0;
-      _displayText = '';
+      _errorMessage = '';
     });
 
-    final mission = await ref.read(getMissionProvider.future);
-    if (!mounted) return;
-    setState(() {
-      _fullText = mission;
-      _isLoading = false;
-    });
-    _startTypingAnimation();
-  }
-
-  void _startTypingAnimation() {
-    if (_isLoading) return;
-    Future.delayed(const Duration(milliseconds: 500), () {
+    try {
+      final mission = await ref.read(getMissionProvider.future);
       if (!mounted) return;
-      _typeNextChar();
+      setState(() {
+        _fullText = mission;
+        _displayText = mission;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _completeMission() async {
+    if (_isLoading) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
     });
-  }
 
-  void _typeNextChar() {
-    if (!mounted) return;
-    if (_charIndex < _fullText.length) {
+    try {
+      final response = await ref.read(missionApiProvider).completeMission(_fullText);
+      if (!mounted) return;
+      
       setState(() {
-        _displayText = _fullText.substring(0, _charIndex + 1);
-        _charIndex++;
+        ref.read(waterLevelProvider.notifier).increaseWaterLevel();
       });
-      Future.delayed(const Duration(milliseconds: 200), _typeNextChar);
-    } else {
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(response.message),
+          backgroundColor: Colors.green,
+        ),
+      );
+      _loadMission();
+    } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _isTypingComplete = true;
+        _errorMessage = e.toString();
+        _isLoading = false;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('미션 완료에 실패했습니다: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
-  }
-
-  void _startShrinkAnimation() {
-    if (!_isAnimating && _isTypingComplete) {
-      setState(() {
-        _isAnimating = true;
-      });
-      ref.read(waterLevelProvider.notifier).increaseWaterLevel();
-      _shrinkController.forward().then((_) {
-        if (!mounted) return;
-        _loadMission();
-      });
-    }
-  }
-
-  void _resetMission() {
-    _shrinkController.reset();
-    _loadMission();
   }
 
   @override
   void dispose() {
-    _shrinkController.dispose();
     _waveController.dispose();
     super.dispose();
   }
@@ -118,7 +108,7 @@ class _MainPageState extends ConsumerState<MainPage> with TickerProviderStateMix
       body: SafeArea(
         child: Stack(
           children: [
-            // 텍스트 애니메이션
+            // 미션 텍스트
             Positioned(
               top: screenHeight * 0.15,
               left: 0,
@@ -126,33 +116,17 @@ class _MainPageState extends ConsumerState<MainPage> with TickerProviderStateMix
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : GestureDetector(
-                      onTap: _startShrinkAnimation,
-                      child: AnimatedBuilder(
-                        animation: _shrinkAnimation,
-                        builder: (context, child) {
-                          final scale = 1.0 - (_shrinkAnimation.value * 0.8);
-                          final opacity = 1.0 - _shrinkAnimation.value;
-                          final moveDown = _shrinkAnimation.value * screenHeight * 0.3;
-                          
-                          return Transform.translate(
-                            offset: Offset(0, moveDown),
-                            child: Opacity(
-                              opacity: opacity,
-                              child: Transform.scale(
-                                scale: scale,
-                                child: Text(
-                                  _displayText,
-                                  style: const TextStyle(
-                                    fontSize: 40,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 2.0,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
+                      onTap: _completeMission,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Text(
+                          _displayText,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ),
             ),
@@ -162,7 +136,7 @@ class _MainPageState extends ConsumerState<MainPage> with TickerProviderStateMix
               top: screenHeight * 0.4,
               left: (screenWidth - 60) / 2,
               child: GestureDetector(
-                onTap: _resetMission,
+                onTap: _loadMission,
                 child: Container(
                   width: 60,
                   height: 60,
@@ -196,7 +170,7 @@ class _MainPageState extends ConsumerState<MainPage> with TickerProviderStateMix
                       ),
                     ),
                   ),
-                  if (_isAnimating || waterLevel > 0)
+                  if (waterLevel > 0)
                     AnimatedBuilder(
                       animation: _waveController,
                       builder: (context, child) {
@@ -213,6 +187,22 @@ class _MainPageState extends ConsumerState<MainPage> with TickerProviderStateMix
                 ],
               ),
             ),
+
+            // 에러 메시지
+            if (_errorMessage.isNotEmpty)
+              Positioned(
+                top: screenHeight * 0.3,
+                left: 0,
+                right: 0,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    _errorMessage,
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -249,75 +239,22 @@ class WavePainter extends CustomPainter {
         baseHeight + math.sin((animation.value * 360 + i) * math.pi / 180) * waveHeight,
       );
     }
-    
+
     path.lineTo(size.width, size.height);
     path.lineTo(0, size.height);
     path.close();
-    
-    canvas.drawPath(path, Paint()..color = waveColor);
-  }
 
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
-
-class LinePainter extends CustomPainter {
-  final String text;
-  final double morphProgress;
-  final double fallProgress;
-  final TextStyle style;
-
-  LinePainter({
-    required this.text,
-    required this.morphProgress,
-    required this.fallProgress,
-    required this.style,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final textPainter = TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    final textWidth = textPainter.width;
-    final lineWidth = textWidth * 1.2; // 선의 길이는 텍스트보다 약간 길게
-    
-    final startX = (size.width - lineWidth) / 2;
-    final startY = size.height * 0.2;
-    final endY = size.height * 0.8;
-    
-    // 텍스트 그리기 (모프 진행에 따라 페이드 아웃)
-    if (morphProgress < 1.0) {
-      textPainter.paint(
-        canvas, 
-        Offset(
-          (size.width - textWidth) / 2,
-          startY + (fallProgress * (endY - startY)),
-        ),
-      );
-    }
-
-    // 선 그리기
     final paint = Paint()
-      ..color = Colors.blue.withOpacity(morphProgress)
-      ..strokeWidth = 3.0
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
+      ..color = waveColor
+      ..style = PaintingStyle.fill;
 
-    // 선이 중앙에서 시작하여 양쪽으로 늘어나는 효과
-    final currentLineWidth = lineWidth * morphProgress;
-    final lineStartX = startX + (lineWidth - currentLineWidth) / 2;
-    final lineY = startY + (fallProgress * (endY - startY));
-
-    canvas.drawLine(
-      Offset(lineStartX, lineY),
-      Offset(lineStartX + currentLineWidth, lineY),
-      paint,
-    );
+    canvas.drawPath(path, paint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(WavePainter oldDelegate) {
+    return oldDelegate.animation != animation ||
+        oldDelegate.fillPercent != fillPercent ||
+        oldDelegate.waveColor != waveColor;
+  }
 }

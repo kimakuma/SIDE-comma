@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../features/mission/pages/mission_page.dart';
+import '../../pages/main_page.dart';
 import '../../features/mission/pages/mission_list_page.dart';
 import '../../features/reward/pages/reward_page.dart';
 import '../../features/community/pages/community_page.dart';
@@ -18,7 +18,7 @@ class _MainNavigationState extends State<MainNavigation> {
   final List<Widget> _pages = [
     const MissionListPage(),
     const RewardPage(),
-    const MissionPage(),
+    const MainPage(),
     const CommunityPage(),
     const MyPage(),
   ];
@@ -34,6 +34,8 @@ class _MainNavigationState extends State<MainNavigation> {
     return Scaffold(
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
@@ -57,10 +59,6 @@ class _MainNavigationState extends State<MainNavigation> {
             label: '마이',
           ),
         ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: Colors.blue,
-        unselectedItemColor: Colors.grey,
-        onTap: _onItemTapped,
       ),
     );
   }
