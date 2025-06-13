@@ -14,8 +14,7 @@ class _AuthApi implements AuthApi {
     this.baseUrl,
     this.errorLogger,
   }) {
-    baseUrl ??=
-        'https://gbkheyv67a.execute-api.us-east-1.amazonaws.com/default';
+    baseUrl ??= 'https://api.comma.com';
   }
 
   final Dio _dio;

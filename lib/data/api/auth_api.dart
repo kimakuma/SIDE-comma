@@ -1,11 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
-import '../../domain/models/auth_response.dart';
-import '../../core/config/env.dart';
+import '../../domain/entities/auth_response.dart';
 
 part 'auth_api.g.dart';
 
-@RestApi(baseUrl: Env.apiBaseUrl)
+@RestApi(baseUrl: "https://api.comma.com")
 abstract class AuthApi {
   factory AuthApi(Dio dio) = _AuthApi;
 

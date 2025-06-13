@@ -1,16 +1,33 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
+class AuthToken {
+  final String accessToken;
+  final String? refreshToken;
+  final DateTime accessTokenExpiresAt;
+  final DateTime? refreshTokenExpiresAt;
 
-part 'auth_token.freezed.dart';
-part 'auth_token.g.dart';
+  AuthToken({
+    required this.accessToken,
+    this.refreshToken,
+    required this.accessTokenExpiresAt,
+    this.refreshTokenExpiresAt,
+  });
 
-@freezed
-class AuthToken with _$AuthToken {
-  const factory AuthToken({
-    required String accessToken,
-    String? refreshToken,
-    required DateTime accessTokenExpiresAt,
-    DateTime? refreshTokenExpiresAt,
-  }) = _AuthToken;
+  Map<String, dynamic> toJson() {
+    return {
+      'accessToken': accessToken,
+      'refreshToken': refreshToken,
+      'accessTokenExpiresAt': accessTokenExpiresAt.toIso8601String(),
+      'refreshTokenExpiresAt': refreshTokenExpiresAt?.toIso8601String(),
+    };
+  }
 
-  factory AuthToken.fromJson(Map<String, dynamic> json) => _$AuthTokenFromJson(json);
+  factory AuthToken.fromJson(Map<String, dynamic> json) {
+    return AuthToken(
+      accessToken: json['accessToken'] as String,
+      refreshToken: json['refreshToken'] as String?,
+      accessTokenExpiresAt: DateTime.parse(json['accessTokenExpiresAt'] as String),
+      refreshTokenExpiresAt: json['refreshTokenExpiresAt'] != null
+          ? DateTime.parse(json['refreshTokenExpiresAt'] as String)
+          : null,
+    );
+  }
 } 

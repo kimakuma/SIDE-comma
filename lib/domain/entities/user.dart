@@ -9,6 +9,22 @@ class User {
     this.profileImageUrl,
   });
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'nickname': nickname,
+      'profileImageUrl': profileImageUrl,
+    };
+  }
+
+  factory User.fromJson(Map<String, dynamic> json) {
+    return User(
+      id: json['id'] as String,
+      nickname: json['nickname'] as String,
+      profileImageUrl: json['profileImageUrl'] as String?,
+    );
+  }
+
   factory User.fromKakaoUser(dynamic kakaoUser) {
     return User(
       id: kakaoUser.id.toString(),
